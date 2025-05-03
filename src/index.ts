@@ -2,10 +2,16 @@ import { Client, Events, GatewayIntentBits } from "discord.js";
 import { registerCommands } from "./commands/commands";
 import connectDB from "./db/connectDB";
 import user from "./db/user";
-import { airDropUser, createWallet, getUserBalance } from "./solana/functions";
+import {
+	airDropUser,
+	createWallet,
+	getUserBalance,
+	sendSOL,
+} from "./solana/functions";
 import {
 	createMainMenuButtons,
 	createWalletMenuButtons,
+	sendModal,
 } from "./utils";
 
 const TOKEN = process.env.TOKEN || "";
@@ -95,6 +101,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 		} else if (interaction.customId === "airdrop") {
 			const userId = interaction.user.id;
 			const username = interaction.user.username;
+
+			interaction.deferReply({ flags: "Ephemeral" });
 			const dropUser = await user.findOne(
 				{
 					userId,
@@ -108,14 +116,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 			const balance = await getUserBalance(dropUser?.publicKey as string);
 
 			if (success && balance) {
-				interaction.reply({
+				interaction.editReply({
 					content: `Successfully airdroped for the user at : \n \n ${dropUser?.publicKey} \n \n Current balance for the user is : ${balance} SOL`,
-					flags: "Ephemeral",
 				});
 			} else {
-				interaction.reply({
+				interaction.editReply({
 					content: "Failed to airdrop user",
-					flags: "Ephemeral",
 				});
 			}
 		} else if (interaction.customId === "balance") {
@@ -183,8 +189,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				components: createWalletMenuButtons(),
 				flags: "Ephemeral",
 			});
-		} 
-	} 
+		} else if (interaction.customId === "send") {
+			interaction.showModal(sendModal());
+		}
+	} else if (interaction.isModalSubmit()) {
+		console.log("MOdal Submitting......");
+
+		interaction.deferReply({ flags: "Ephemeral" });
+
+		const userId = interaction.user.id;
+		const username = interaction.user.username;
+		const sender = await user.findOne({
+			userId,
+			username,
+		});
+
+		const receiver = interaction.fields.getTextInputValue("reciever");
+		const amount = interaction.fields.getTextInputValue("amount");
+
+		// console.log(receiver, amount);
+
+		const success = await sendSOL(
+			sender?.privateKey as string,
+			receiver,
+			amount
+		);
+
+		if (success) {
+			interaction.editReply({ content: "Successfull!" });
+		} else {
+			interaction.editReply({ content: "Faced issue doing transaction" });
+		}
+	}
 });
 
 client.login(TOKEN);

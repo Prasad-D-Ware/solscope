@@ -63,4 +63,26 @@ export function createWalletMenuButtons() {
 }
 
 
+export function sendModal() {
+	const modal = new ModalBuilder()
+		.setCustomId('sendModal')
+		.setTitle('Send SOL')
+		.addComponents(
+			new ActionRowBuilder<TextInputBuilder>().addComponents(
+				new TextInputBuilder()
+					.setCustomId("reciever")
+					.setLabel("Receiver's Address")
+					.setStyle(TextInputStyle.Short)
+					.setRequired(true)
+			),
+			new ActionRowBuilder<TextInputBuilder>().addComponents(
+				new TextInputBuilder()
+					.setCustomId("amount") 
+					.setLabel("Amount (SOL)")
+					.setStyle(TextInputStyle.Short)
+					.setRequired(true)
+			)
+		);
 
+	return modal;
+}

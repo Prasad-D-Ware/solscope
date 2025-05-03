@@ -3,6 +3,9 @@ import {
 	Keypair,
 	LAMPORTS_PER_SOL,
 	PublicKey,
+	sendAndConfirmTransaction,
+	SystemProgram,
+	Transaction,
 } from "@solana/web3.js";
 
 const connection = new Connection("https://api.devnet.solana.com");
@@ -24,22 +27,45 @@ export const airDropUser = async (publickey: string) => {
 	}
 };
 
-export const getUserBalance = async (publickey : string) =>{
-    try {
-        const balance = await connection.getBalance(
-            new PublicKey(publickey)
-        )
+export const getUserBalance = async (publickey: string) => {
+	try {
+		const balance = await connection.getBalance(new PublicKey(publickey));
 		// console.log(balance,"balance");
-		if(balance === 0){
+		if (balance === 0) {
 			return 0;
 		}
 
-        return balance / LAMPORTS_PER_SOL;
-    } catch (error : any) {
-        return null
-    }
-}
+		return balance / LAMPORTS_PER_SOL;
+	} catch (error: any) {
+		return null;
+	}
+};
 
-export const sendSOL = async ( sender : string , receiver : string , amount : number) => {
-	
-}
+export const sendSOL = async (
+	sender: string,
+	receiver: string,
+	amount: string
+) => {
+	try {
+		const keys = sender.split(",").map(Number);
+		const secretKeyBytes = Uint8Array.from(keys);
+		const payer = Keypair.fromSecretKey(secretKeyBytes);
+
+		const tx = new Transaction().add(
+			SystemProgram.transfer({
+				toPubkey: new PublicKey(receiver),
+				fromPubkey: new PublicKey(payer.publicKey),
+				lamports: Number(amount) * LAMPORTS_PER_SOL,
+			})
+		);
+
+		tx.feePayer = payer.publicKey;
+		tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+		await sendAndConfirmTransaction(connection, tx, [payer]);
+
+		return true;
+	} catch (error: any) {
+		return false;
+	}
+};
