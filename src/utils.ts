@@ -1,4 +1,12 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from "discord.js";
+import {
+	ActionRowBuilder,
+	ButtonBuilder,
+	ButtonStyle,
+	EmbedBuilder,
+	ModalBuilder,
+	TextInputBuilder,
+	TextInputStyle,
+} from "discord.js";
 
 export function createMainMenuButtons() {
 	// Top row: Buy and Fund
@@ -31,13 +39,13 @@ export function createMainMenuButtons() {
 	return [topRow, secondRow];
 }
 
-export function createWalletMenuButtons() {
+export function createWalletMenuButtons(publicKey: string) {
 	const topRow = new ActionRowBuilder().addComponents(
 		new ButtonBuilder()
-			.setCustomId("view")
+			.setURL(`https://explorer.solana.com/address/${publicKey}?cluster=devnet`)
 			.setLabel("View on Explorer")
-			.setStyle(ButtonStyle.Secondary),
-			
+			.setStyle(ButtonStyle.Link),
+
 		new ButtonBuilder()
 			.setCustomId("send")
 			.setLabel("Send SOL")
@@ -62,11 +70,10 @@ export function createWalletMenuButtons() {
 	return [topRow, secondRow];
 }
 
-
 export function sendModal() {
 	const modal = new ModalBuilder()
-		.setCustomId('sendModal')
-		.setTitle('Send SOL')
+		.setCustomId("sendModal")
+		.setTitle("Send SOL")
 		.addComponents(
 			new ActionRowBuilder<TextInputBuilder>().addComponents(
 				new TextInputBuilder()
@@ -77,7 +84,7 @@ export function sendModal() {
 			),
 			new ActionRowBuilder<TextInputBuilder>().addComponents(
 				new TextInputBuilder()
-					.setCustomId("amount") 
+					.setCustomId("amount")
 					.setLabel("Amount (SOL)")
 					.setStyle(TextInputStyle.Short)
 					.setRequired(true)
@@ -85,4 +92,46 @@ export function sendModal() {
 		);
 
 	return modal;
+}
+
+export function resetEmbed() {
+	const embed = new EmbedBuilder()
+		.setTitle("Are You sure? Reset Wallet?")
+		.setDescription(
+			"Confirming this would reset the current account and never access the account."
+		);
+
+	const row = new ActionRowBuilder().addComponents(
+		new ButtonBuilder()
+			.setCustomId("confirm_reset")
+			.setLabel("Confirm Reset")
+			.setStyle(ButtonStyle.Danger),
+		new ButtonBuilder()
+			.setCustomId("cancel_reset")
+			.setLabel("Cancel")
+			.setStyle(ButtonStyle.Secondary)
+	);
+
+	return { embed, row };
+}
+
+export function exportEmbed() {
+	const embed = new EmbedBuilder()
+		.setTitle("Are You sure? Export the Wallet?")
+		.setDescription(
+			"Confirming this would export the current account's private key and delete from the SolScope Database \n  You can only export once"
+		);
+
+	const row = new ActionRowBuilder().addComponents(
+		new ButtonBuilder()
+			.setCustomId("confirm_export")
+			.setLabel("Confirm Export")
+			.setStyle(ButtonStyle.Danger),
+		new ButtonBuilder()
+			.setCustomId("cancel_export")
+			.setLabel("Cancel")
+			.setStyle(ButtonStyle.Secondary)
+	);
+
+	return { embed, row };
 }
