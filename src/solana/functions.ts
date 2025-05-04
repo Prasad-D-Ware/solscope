@@ -7,6 +7,7 @@ import {
 	SystemProgram,
 	Transaction,
 } from "@solana/web3.js";
+import axios from "axios";
 
 const connection = new Connection("https://api.devnet.solana.com");
 export const createWallet = () => {
@@ -68,4 +69,15 @@ export const sendSOL = async (
 	} catch (error: any) {
 		return false;
 	}
+};
+
+export const getSolPrice = async () => {
+	const response = await axios.get(
+		"https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+	);
+	// console.log(response.data);
+
+	const price = response.data.solana.usd;
+
+	return price;
 };

@@ -5,6 +5,7 @@ import user from "./db/user";
 import {
 	airDropUser,
 	createWallet,
+	getSolPrice,
 	getUserBalance,
 	sendSOL,
 } from "./solana/functions";
@@ -379,6 +380,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					.catch((error) => {
 						console.error("Error updating message:", error);
 					});
+			} else if (interaction.customId === "current_price") {
+				// await interaction.deferReply({flags : "Ephemeral"});
+
+				const solPrice = await getSolPrice();
+
+				if (!solPrice) {
+					await interaction.reply({
+						content: "Failed to fetch Current price for SOL",
+					});
+					return;
+				}
+
+				await interaction.reply({
+					content: `The current price of SOL : \n\n 1 SOL = ${solPrice} USD`,
+				});
 			}
 		} else if (interaction.isModalSubmit()) {
 			// console.log("MOdal Submitting......");

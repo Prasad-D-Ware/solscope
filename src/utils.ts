@@ -64,6 +64,10 @@ export function createWalletMenuButtons(publicKey: string) {
 		new ButtonBuilder()
 			.setCustomId("export")
 			.setLabel("Export Wallet")
+			.setStyle(ButtonStyle.Secondary),
+		new ButtonBuilder()
+			.setCustomId("current_price")
+			.setLabel("Current Price : SOL")
 			.setStyle(ButtonStyle.Secondary)
 	);
 
