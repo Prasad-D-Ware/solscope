@@ -388,12 +388,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				if (!solPrice) {
 					await interaction.reply({
 						content: "Failed to fetch Current price for SOL",
+						flags: "Ephemeral",
 					});
 					return;
 				}
 
 				await interaction.reply({
 					content: `The current price of SOL : \n\n 1 SOL = ${solPrice} USD`,
+					flags: "Ephemeral",
 				});
 			}
 		} else if (interaction.isModalSubmit()) {
