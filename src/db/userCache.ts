@@ -28,6 +28,7 @@ class UserCache {
         const dbUser = await user.findOne({ userId, username });
         if (!dbUser) return null;
 
+        // The private key will be automatically decrypted by the mongoose getter
         const userData: CachedUser = {
             userId: dbUser.userId as string,
             username: dbUser.username as string,
