@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits } from "discord.js";
 import { registerCommands } from "./commands/commands";
 import connectDB from "./db/connectDB";
 import user from "./db/user";
+import { userCache } from "./db/userCache";
 import {
 	airDropUser,
 	createWallet,
@@ -49,15 +50,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 	try {
 		if (interaction.isChatInputCommand()) {
 			if (interaction.commandName === "start") {
-				// console.log(interaction.user.id);
 				const userId = interaction.user.id;
 				const username = interaction.user.username;
-				const dbUser: any = await user.findOne({
-					userId,
-					username,
-				});
-
-				// console.log(dbUser + " db user find");
+				const dbUser = await userCache.getUser(userId, username);
 
 				if (!dbUser) {
 					const keypair = createWallet();
@@ -68,12 +63,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 						publicKey: keypair.publicKey.toString(),
 					});
 
-					// console.log(newUser + " new user created");
 					await interaction
 						.reply({
 							content: `Welcome to SolScope \n\n A one stop discord wallet solution for solana \n\n Created Your publicKey :\n ${newUser.publicKey} \n \n interact with the wallet using below options :`,
-							// @ts-ignore
-							components: createMainMenuButtons(),
+							components: createMainMenuButtons().map((row) => row.toJSON()),
 							flags: "Ephemeral",
 						})
 						.catch((error) => {
@@ -83,15 +76,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					await interaction
 						.reply({
 							content: `Welcome to SolScope \n\n A one stop discord wallet solution for solana \n\n Your publicKey :\n ${dbUser.publicKey} \n\n interact with the wallet using below options :`,
-							// @ts-ignore
-							components: createMainMenuButtons(),
+							components: createMainMenuButtons().map((row) => row.toJSON()),
 							flags: "Ephemeral",
 						})
 						.catch((error) => {
 							console.error("Error replying to interaction:", error);
 						});
 				}
-				// console.log(dbUser);
 			} else if (interaction.commandName === "send") {
 				await interaction.deferReply({ flags: "Ephemeral" }).catch((error) => {
 					console.error("Error deferring reply:", error);
@@ -101,15 +92,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				const username = interaction.user.username;
 				const userId = interaction.user.id;
 
-				const fromUser = await user.findOne(
-					{
-						userId,
-						username,
-					},
-					{
-						privateKey: 1,
-					}
-				);
+				const fromUser = await userCache.getUser(userId, username);
 
 				if (!fromUser) {
 					await interaction.editReply({
@@ -123,20 +106,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				const sendUserId = interaction.options.getUser("user")?.id;
 				const amount = interaction.options.getString("amount");
 
-				const sendTo = await user.findOne(
-					{
-						userId: sendUserId,
-						username: sendUsername,
-					},
-					{
-						publicKey: 1,
-					}
-				);
+				if (!sendUsername || !sendUserId) {
+					await interaction.editReply({
+						content: "Invalid user selected",
+					});
+					return;
+				}
+
+				const sendTo = await userCache.getUser(sendUserId, sendUsername);
 
 				if (sendTo) {
 					const success = await sendSOL(
-						fromUser?.privateKey as string,
-						sendTo?.publicKey as string,
+						fromUser.privateKey,
+						sendTo.publicKey,
 						amount as string
 					);
 
@@ -163,15 +145,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 			if (interaction.customId === "fund") {
 				const userId = interaction.user.id;
 				const username = interaction.user.username;
-				const fundUser = await user.findOne(
-					{
-						userId,
-						username,
-					},
-					{
-						publicKey: 1,
-					}
-				);
+				const fundUser = await userCache.getUser(userId, username);
+
 				await interaction
 					.reply({
 						content: `Add funds to this address : \n \n ${fundUser?.publicKey} \n`,
@@ -188,22 +163,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					console.error("Error deferring reply:", error);
 					return;
 				});
-				const dropUser = await user.findOne(
-					{
-						userId,
-						username,
-					},
-					{
-						publicKey: 1,
-					}
-				);
-				const success = await airDropUser(dropUser?.publicKey as string);
-				const balance = await getUserBalance(dropUser?.publicKey as string);
+
+				const dropUser = await userCache.getUser(userId, username);
+				if (!dropUser) {
+					await interaction.editReply({
+						content: "User not found. Please use /start first.",
+					});
+					return;
+				}
+
+				const success = await airDropUser(dropUser.publicKey);
+				const balance = await getUserBalance(dropUser.publicKey);
 
 				if (success && balance) {
 					await interaction
 						.editReply({
-							content: `Successfully airdroped for the user at : \n \n ${dropUser?.publicKey} \n \n Current balance for the user is : ${balance} SOL`,
+							content: `Successfully airdroped for the user at : \n \n ${dropUser.publicKey} \n \n Current balance for the user is : ${balance} SOL`,
 						})
 						.catch((error) => {
 							console.error("Error editing reply:", error);
@@ -221,21 +196,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				const userId = interaction.user.id;
 				const username = interaction.user.username;
 				await interaction.deferReply({ flags: "Ephemeral" });
-				const User = await user.findOne(
-					{
-						userId,
-						username,
-					},
-					{
-						publicKey: 1,
-					}
-				);
 
-				const balance = await getUserBalance(User?.publicKey as string);
+				const User = await userCache.getUser(userId, username);
+				if (!User) {
+					await interaction.editReply({
+						content: "User not found. Please use /start first.",
+					});
+					return;
+				}
+
+				const balance = await getUserBalance(User.publicKey);
 
 				if (balance !== null) {
 					interaction.editReply({
-						content: `Current balance for the user : \n \n ${User?.publicKey} \n \n ${balance} SOL`,
+						content: `Current balance for the user : \n \n ${User.publicKey} \n \n ${balance} SOL`,
 					});
 				} else {
 					interaction.editReply({
@@ -245,40 +219,40 @@ client.on(Events.InteractionCreate, async (interaction) => {
 			} else if (interaction.customId === "refresh") {
 				const userId = interaction.user.id;
 				const username = interaction.user.username;
-				const refUser = await user.findOne(
-					{
-						userId,
-						username,
-					},
-					{
-						publicKey: 1,
-					}
-				);
+				const refUser = await userCache.getUser(userId, username);
+
+				if (!refUser) {
+					await interaction.reply({
+						content: "User not found. Please use /start first.",
+						flags: "Ephemeral",
+					});
+					return;
+				}
+
 				await interaction.reply({
-					content: `Welcome to SolScope Bot \n\n A one stop discord wallet solution for solana \n\npublicKey : ${refUser?.publicKey} \n \n interact with the wallet using below options :`,
-					// @ts-ignore
-					components: createMainMenuButtons(),
+					content: `Welcome to SolScope Bot \n\n A one stop discord wallet solution for solana \n\npublicKey : ${refUser.publicKey} \n \n interact with the wallet using below options :`,
+					components: createMainMenuButtons().map((row) => row.toJSON()),
 					flags: "Ephemeral",
 				});
 			} else if (interaction.customId === "wallet") {
 				const userId = interaction.user.id;
 				const username = interaction.user.username;
 
-				const User = await user.findOne(
-					{
-						userId,
-						username,
-					},
-					{
-						publicKey: 1,
-					}
-				);
+				const User = await userCache.getUser(userId, username);
+				if (!User) {
+					await interaction.reply({
+						content: "User not found. Please use /start first.",
+						flags: "Ephemeral",
+					});
+					return;
+				}
 
-				const balance = await getUserBalance(User?.publicKey as string);
+				const balance = await getUserBalance(User.publicKey);
 				await interaction.reply({
-					content: `This is your SolScope Wallet \n \n publicKey : ${User?.publicKey} \n \n Balance : ${balance} SOL \n\n Select options from below`,
-					// @ts-ignore
-					components: createWalletMenuButtons(User?.publicKey),
+					content: `This is your SolScope Wallet \n \n publicKey : ${User.publicKey} \n \n Balance : ${balance} SOL \n\n Select options from below`,
+					components: createWalletMenuButtons(User.publicKey).map((row) =>
+						row.toJSON()
+					),
 					flags: "Ephemeral",
 				});
 			} else if (interaction.customId === "send") {
@@ -291,8 +265,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					flags: "Ephemeral",
 				});
 			} else if (interaction.customId === "confirm_reset") {
-				console.log("confirm reset!");
-				// reset logic here
 				const username = interaction.user.username;
 				const userId = interaction.user.id;
 
@@ -300,6 +272,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					userId,
 					username,
 				});
+
+				userCache.invalidateUser(userId, username);
 
 				if (User.acknowledged) {
 					const keypair = createWallet();
@@ -320,8 +294,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					await interaction
 						.update({
 							content: `Welcome to SolScope \n\n A one stop discord wallet solution for solana \n\n Reseted Your Account \n\n publicKey : ${newUser.publicKey} \n \n interact with the wallet using below options :`,
-							// @ts-ignore
-							components: createMainMenuButtons(),
+							components: createMainMenuButtons().map((row) => row.toJSON()),
 							embeds: [],
 						})
 						.catch((error) => {
@@ -329,7 +302,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 						});
 				}
 			} else if (interaction.customId === "cancel_reset") {
-				// console.log("cancel reset!")
 				await interaction
 					.update({
 						content: "Cancelled Wallet Reset",
@@ -347,18 +319,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					flags: "Ephemeral",
 				});
 			} else if (interaction.customId === "confirm_export") {
-				console.log("export confirmed!");
 				const username = interaction.user.username;
 				const userId = interaction.user.id;
 
-				const User = await user.findOne({
-					userId,
-					username,
-				});
+				const User = await userCache.getUser(userId, username);
+				if (!User) {
+					await interaction.update({
+						content: "User not found. Please use /start first.",
+					});
+					return;
+				}
 
 				await interaction
 					.update({
-						content: `Your Exported Private Key : \n\n [${User?.privateKey}] \n\n Save this secret key for importing in new Wallet `,
+						content: `Your Exported Private Key : \n\n [${User.privateKey}] \n\n Save this secret key for importing in new Wallet `,
 						embeds: [],
 						components: [],
 					})
@@ -370,6 +344,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					userId,
 					username,
 				});
+				userCache.invalidateUser(userId, username);
 			} else if (interaction.customId === "cancel_export") {
 				await interaction
 					.update({
@@ -381,8 +356,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 						console.error("Error updating message:", error);
 					});
 			} else if (interaction.customId === "current_price") {
-				// await interaction.deferReply({flags : "Ephemeral"});
-
 				const solPrice = await getSolPrice();
 
 				if (!solPrice) {
@@ -399,8 +372,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				});
 			}
 		} else if (interaction.isModalSubmit()) {
-			// console.log("MOdal Submitting......");
-
 			await interaction.deferReply({ flags: "Ephemeral" }).catch((error) => {
 				console.error("Error deferring modal reply:", error);
 				return;
@@ -408,21 +379,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 			const userId = interaction.user.id;
 			const username = interaction.user.username;
-			const sender = await user.findOne({
-				userId,
-				username,
-			});
+			const sender = await userCache.getUser(userId, username);
+
+			if (!sender) {
+				await interaction.editReply({
+					content: "User not found. Please use /start first.",
+				});
+				return;
+			}
 
 			const receiver = interaction.fields.getTextInputValue("reciever");
 			const amount = interaction.fields.getTextInputValue("amount");
 
-			// console.log(receiver, amount);
-
-			const success = await sendSOL(
-				sender?.privateKey as string,
-				receiver,
-				amount
-			);
+			const success = await sendSOL(sender.privateKey, receiver, amount);
 
 			if (success) {
 				await interaction
@@ -440,22 +409,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 		}
 	} catch (error: any) {
 		console.error("Error handling interaction:", error);
-		// Only try to reply if the interaction is still valid
-		// if (
-		// 	interaction.isRepliable() &&
-		// 	!interaction.replied &&
-		// 	!interaction.deferred
-		// ) {
-		// 	try {
-		// 		await interaction.reply({
-		// 			content:
-		// 				"An error occurred while processing your request. Please try again.",
-		// 			ephemeral: true,
-		// 		});
-		// 	} catch (replyError) {
-		// 		console.error("Error sending error message:", replyError);
-		// 	}
-		// }
 	}
 });
 
