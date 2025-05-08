@@ -16,7 +16,7 @@ import {
 	exportEmbed,
 	resetEmbed,
 	sendModal,
-} from "./utils";
+} from "./utils/discord";
 
 const TOKEN = process.env.TOKEN || "";
 
