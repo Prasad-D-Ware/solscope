@@ -8,6 +8,7 @@ import {
 	Transaction,
 } from "@solana/web3.js";
 import axios from "axios";
+import bs58 from "bs58";
 
 const connection = new Connection("https://api.devnet.solana.com");
 export const createWallet = () => {
@@ -81,3 +82,13 @@ export const getSolPrice = async () => {
 
 	return price;
 };
+
+
+export const base58ToKeypair = (base58PrivateKey : string) => {
+	try {
+		const privateKeyBuffer = bs58.decode(base58PrivateKey);
+		return Keypair.fromSecretKey(privateKeyBuffer);
+	} catch (error) {
+		throw new Error("Invalid base58 private key.");
+	}
+}

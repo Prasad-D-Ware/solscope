@@ -23,6 +23,18 @@ const commands = [
 			},
 		],
 	},
+	{
+		name: "import",
+		description: "Import a wallet from a private key",
+		options: [
+			{
+				name: "privatekey",
+				description: " bs58 private key of the external wallet",
+				type: 3, //string type
+				required: true,
+			},
+		],
+	},
 ];
 
 const rest = new REST({ version: "10" }).setToken(process.env.TOKEN!);

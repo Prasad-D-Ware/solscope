@@ -139,3 +139,41 @@ export function exportEmbed() {
 
 	return { embed, row };
 }
+
+export function importEmbed() {
+	const embed = new EmbedBuilder()
+		.setTitle("Are You sure? Import the Wallet?")
+		.setDescription(
+			"Confirming this would remove the existing SolScope Wallet and import the external one"
+		);
+
+	const row = new ActionRowBuilder().addComponents(
+		new ButtonBuilder()
+			.setCustomId("confirm_import_modal")
+			.setLabel("Confirm Import")
+			.setStyle(ButtonStyle.Danger),
+		new ButtonBuilder()
+			.setCustomId("cancel_import")
+			.setLabel("Cancel")
+			.setStyle(ButtonStyle.Secondary)
+	);
+	
+	return { embed, row };
+}
+
+export function importModal() {
+	const modal = new ModalBuilder()
+		.setCustomId("importModal")
+		.setTitle("Import Wallet")
+		.addComponents(
+			new ActionRowBuilder<TextInputBuilder>().addComponents(
+				new TextInputBuilder()
+					.setCustomId("privatekey")
+					.setLabel("Private Key (bs58 format)")
+					.setStyle(TextInputStyle.Paragraph)
+					.setRequired(true)
+			)
+		);
+
+	return modal;
+}

@@ -5,6 +5,7 @@ import user from "./db/user";
 import { userCache } from "./db/userCache";
 import {
 	airDropUser,
+	base58ToKeypair,
 	createWallet,
 	getSolPrice,
 	getUserBalance,
@@ -14,6 +15,8 @@ import {
 	createMainMenuButtons,
 	createWalletMenuButtons,
 	exportEmbed,
+	importEmbed,
+	importModal,
 	resetEmbed,
 	sendModal,
 } from "./utils/discord";
@@ -138,6 +141,60 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				} else {
 					await interaction.editReply({
 						content: "Selected User doesn't have SolScope Wallet.",
+					});
+				}
+			} else if (interaction.commandName === "import") {
+				const username = interaction.user.username;
+				const userId = interaction.user.id;
+				const bs58privateKey = interaction.options.getString("privatekey");
+
+				await interaction.deferReply({
+					flags: "Ephemeral",
+				});
+
+				const User = await userCache.getUser(userId, username);
+
+				if (User) {
+					const { embed, row } = importEmbed();
+					await interaction.editReply({
+						embeds: [embed],
+						components: [row.toJSON()],
+					});
+					return;
+				}
+
+				try {
+					const keypair = base58ToKeypair(bs58privateKey as string);
+
+					const newUser = {
+						userId,
+						username,
+						privateKey: keypair.secretKey,
+						publicKey: keypair.publicKey.toString(),
+					};
+
+					const createdUser = await user.create(newUser);
+
+					if (!createdUser) {
+						await interaction.editReply({
+							content: "Failed to Import wallet and create user!",
+						});
+						return;
+					}
+
+					await interaction
+						.editReply({
+							content: `Welcome to SolScope \n\n A one stop discord wallet solution for solana \n\nImported Your publicKey :\n ${createdUser.publicKey} \n\n interact with the wallet using below options :`,
+							components: createMainMenuButtons().map((row) => row.toJSON()),
+						})
+						.catch((error) => {
+							console.error("Error replying to interaction:", error);
+						});
+				} catch (error) {
+					console.error("Error importing wallet:", error);
+					await interaction.editReply({
+						content:
+							"Error importing wallet. Please check your private key and try again.",
 					});
 				}
 			}
@@ -377,41 +434,103 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					content: `The current price of SOL : \n\n 1 SOL = ${solPrice} USD`,
 					flags: "Ephemeral",
 				});
+			} else if (interaction.customId === "confirm_import_modal") {
+				await interaction.showModal(importModal());
+			} else if (interaction.customId === "cancel_import") {
+				await interaction.update({
+					content: "Cancelled Importing External Wallet",
+					components: [],
+					embeds: [],
+				});
 			}
 		} else if (interaction.isModalSubmit()) {
-			await interaction.deferReply({ flags: "Ephemeral" }).catch((error) => {
-				console.error("Error deferring modal reply:", error);
-				return;
-			});
-
-			const userId = interaction.user.id;
-			const username = interaction.user.username;
-			const sender = await userCache.getUser(userId, username);
-
-			if (!sender) {
-				await interaction.editReply({
-					content: "User not found. Please use /start first.",
+			if (interaction.customId === "importModal") {
+				await interaction.deferReply({ flags: "Ephemeral" }).catch((error) => {
+					console.error("Error deferring modal reply:", error);
+					return;
 				});
-				return;
-			}
 
-			const receiver = interaction.fields.getTextInputValue("reciever");
-			const amount = interaction.fields.getTextInputValue("amount");
+				const userId = interaction.user.id;
+				const username = interaction.user.username;
+				const bs58privateKey =
+					interaction.fields.getTextInputValue("privatekey");
 
-			const success = await sendSOL(sender.privateKey, receiver, amount);
-
-			if (success) {
-				await interaction
-					.editReply({ content: "Successfully Send SOL!" })
-					.catch((error) => {
-						console.error("Error editing modal reply:", error);
+				try {
+					await user.deleteOne({
+						userId,
+						username,
 					});
-			} else {
-				await interaction
-					.editReply({ content: "Faced issue doing transaction" })
-					.catch((error) => {
-						console.error("Error editing modal reply:", error);
+
+					userCache.invalidateUser(userId, username);
+
+					const keypair = base58ToKeypair(bs58privateKey);
+
+					const newUser = {
+						userId,
+						username,
+						privateKey: keypair.secretKey,
+						publicKey: keypair.publicKey.toString(),
+					};
+
+					const createdUser = await user.create(newUser);
+
+					if (!createdUser) {
+						await interaction.editReply({
+							content: "Failed to Import wallet and create user!",
+						});
+						return;
+					}
+
+					await interaction
+						.editReply({
+							content: `Welcome to SolScope \n\n A one stop discord wallet solution for solana \n\nImported Your publicKey :\n ${createdUser.publicKey} \n\n interact with the wallet using below options :`,
+							components: createMainMenuButtons().map((row) => row.toJSON()),
+						})
+						.catch((error) => {
+							console.error("Error replying to interaction:", error);
+						});
+				} catch (error) {
+					console.error("Error during wallet import:", error);
+					await interaction.editReply({
+						content:
+							"Error during wallet import. Please check your private key and try again.",
 					});
+				}
+			} else if (interaction.customId === "sendModal") {
+				await interaction.deferReply({ flags: "Ephemeral" }).catch((error) => {
+					console.error("Error deferring modal reply:", error);
+					return;
+				});
+
+				const userId = interaction.user.id;
+				const username = interaction.user.username;
+				const sender = await userCache.getUser(userId, username);
+
+				if (!sender) {
+					await interaction.editReply({
+						content: "User not found. Please use /start first.",
+					});
+					return;
+				}
+
+				const receiver = interaction.fields.getTextInputValue("reciever");
+				const amount = interaction.fields.getTextInputValue("amount");
+
+				const success = await sendSOL(sender.privateKey, receiver, amount);
+
+				if (success) {
+					await interaction
+						.editReply({ content: "Successfully Send SOL!" })
+						.catch((error) => {
+							console.error("Error editing modal reply:", error);
+						});
+				} else {
+					await interaction
+						.editReply({ content: "Faced issue doing transaction" })
+						.catch((error) => {
+							console.error("Error editing modal reply:", error);
+						});
+				}
 			}
 		}
 	} catch (error: any) {
