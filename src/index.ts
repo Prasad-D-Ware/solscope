@@ -330,9 +330,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 					return;
 				}
 
+				// console.log(`Private key: ${User.privateKey}`);
 				await interaction
 					.update({
-						content: `Your Exported Private Key : \n\n [${User.privateKey}] \n\n Save this secret key for importing in new Wallet `,
+						content: `Your Exported Private Key : \n\n[${User.privateKey}]\n\n Save this secret key for importing in new Wallet `,
 						embeds: [],
 						components: [],
 					})
@@ -340,11 +341,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 						console.error("Error updating message:", error);
 					});
 
-				await user.deleteOne({
-					userId,
-					username,
-				});
-				userCache.invalidateUser(userId, username);
+				await user
+					.deleteOne({
+						userId,
+						username,
+					})
+					.then(() => {
+						userCache.invalidateUser(userId, username);
+					})
+					.catch((error) => {
+						console.error("Error deleting user:", error);
+					});
 			} else if (interaction.customId === "cancel_export") {
 				await interaction
 					.update({
