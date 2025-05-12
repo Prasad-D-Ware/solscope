@@ -16,15 +16,22 @@ export const createWallet = () => {
 	return keypair;
 };
 
-export const airDropUser = async (publickey: string) => {
+export const airDropUser = async (publickey: string): Promise<boolean> => {
 	try {
-		const airdrop = await connection.requestAirdrop(
+		const airdropSignature = await connection.requestAirdrop(
 			new PublicKey(publickey),
 			1 * LAMPORTS_PER_SOL
 		);
-		console.log(airdrop);
-		return true;
+		
+		const confirmation = await connection.confirmTransaction({
+			signature: airdropSignature,
+			blockhash: (await connection.getLatestBlockhash()).blockhash,
+			lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
+		});
+
+		return !confirmation.value.err;
 	} catch (error: any) {
+		console.error('Airdrop error:', error);
 		return false;
 	}
 };
