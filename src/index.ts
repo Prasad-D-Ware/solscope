@@ -20,6 +20,7 @@ import {
 	resetEmbed,
 	sendModal,
 } from "./utils/discord";
+import channelLog from "./db/channels";
 
 const TOKEN = process.env.TOKEN || "";
 
@@ -58,6 +59,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				const dbUser = await userCache.getUser(userId, username);
 
 				if (!dbUser) {
+					try {
+						await channelLog.create({
+							serverName: interaction.guild?.name || 'Unknown Server',
+							//@ts-ignore
+							channelName: interaction.channel?.name || 'Unknown Channel',
+							username: username
+						});
+					} catch (error) {
+						console.error('Error logging channel usage:', error);
+					}
 					const keypair = createWallet();
 					const newUser = await user.create({
 						userId,
